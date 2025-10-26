@@ -28,11 +28,21 @@ public class ChatController {
         return "Message sent";
     }
 
+    @GetMapping("/listPendingRequests")
+    public List<SessionRequest> getPendingRequests()
+    {
+        return mqttService.getPendingSessionRequests();
+    }
+
+    @GetMapping("/listActiveSessions")
+    //Session ID - participante
+    public Map<String, String> getActiveSessions(){
+        return mqttService.getActiveSessions();
+    }
+
     @PostMapping("/acceptSession")
-    public String acceptSession(
-            @RequestParam String toId,
-            @RequestParam String sessionId) throws Exception {
-        mqttService.acceptSession(toId, sessionId);
+    public String acceptSession(@RequestParam String sessionId) throws Exception {
+        mqttService.acceptSession(sessionId);
         return "Session accepted: " + sessionId;
     }
 

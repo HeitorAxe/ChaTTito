@@ -9,8 +9,8 @@
         .offline-overlay {
             position: absolute;
             inset: 0;
-            background-color: rgba(17, 24, 39, 0.95); /* A dark, theme-appropriate overlay */
-            z-index: 50; /* Ensures it's on top of the main content */
+            background-color: rgba(17, 24, 39, 0.95);
+            z-index: 50;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -26,7 +26,6 @@
     <h1 class="text-xl font-bold text-center">Chattito</h1>
     <h2 id="userId" class="font-bold mb-4 text-center">User</h2>
 
-    <!-- Status Section -->
     <div class="my-4 p-3 bg-gray-900 rounded-lg">
         <div class="flex items-center justify-center">
             <span class="mr-2 text-gray-400">Status:</span>
@@ -35,22 +34,24 @@
         <button id="btnToggleStatus" class="w-full mt-2 px-4 py-2 rounded font-semibold"></button>
     </div>
 
-    <!-- Navigation Buttons -->
-    <button id="btnListUsers" class="sidebar-btn">List Users</button>
+    <p class="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase">Direct Chats</p>
+    <button id="btnListUsers" class="sidebar-btn">Find Users</button>
+    <button id="btnPendingRequests" class="sidebar-btn">Pending Requests</button>
+    <button id="btnActiveSessions" class="sidebar-btn">Active Sessions</button>
+
+    <p class="px-4 pt-4 pb-2 text-xs text-gray-400 uppercase">Groups</p>
     <button id="btnListGroups" class="sidebar-btn">List Groups</button>
     <button id="btnMyGroups" class="sidebar-btn">My Groups</button>
     <button id="btnRequests" class="sidebar-btn">Group Requests</button>
     <button id="btnEnterCreate" class="sidebar-btn">Enter/Create Group</button>
 </aside>
 
-<!-- Main Content Wrapper -->
 <div class="flex-1 relative">
     <main id="mainContent" class="p-6 overflow-y-auto h-full">
         <h2 class="text-2xl font-semibold mb-4">Welcome</h2>
         <p>Select an option from the sidebar.</p>
     </main>
 
-    <!-- This overlay now only covers the main content area -->
     <div id="offline-blocker" class="offline-overlay" style="display: none;">
         <span>You are offline. <br> Please go online to continue.</span>
     </div>
@@ -73,6 +74,11 @@
 
     userIdComponent.textContent = clientId;
 
+
+    function cleanUpView() {
+        main.innerHTML = '';
+    }
+
     buttons.forEach(btn => {
         btn.classList.add('w-full', 'text-left', 'px-4', 'py-2', 'rounded', 'hover:bg-gray-700', 'disabled:opacity-50', 'disabled:cursor-not-allowed');
         btn.addEventListener('click', () => {
@@ -94,127 +100,77 @@
         return await res.text();
     }
 
+
     async function checkStatus() {
-        try {
-            isOnline = await getJSON(`${baseUrl}/user/status`);
-        } catch (e) {
-            console.error("Failed to fetch status, assuming offline.", e);
-            isOnline = false;
-        }
+        try { isOnline = await getJSON(`${baseUrl}/user/status`); }
+        catch (e) { console.error("Failed to fetch status, assuming offline.", e); isOnline = false; }
         updateStatusUI();
     }
 
     function updateStatusUI() {
         if (isOnline) {
             userStatusComponent.textContent = "Online";
-            userStatusComponent.style.color = "#4ade80"; // Green-400
+            userStatusComponent.style.color = "#4ade80";
             btnToggleStatus.textContent = "Go Offline";
             btnToggleStatus.className = "w-full mt-2 px-4 py-2 rounded font-semibold bg-red-600 hover:bg-red-700";
             offlineBlocker.style.display = 'none';
             buttons.forEach(btn => btn.disabled = false);
         } else {
             userStatusComponent.textContent = "Offline";
-            userStatusComponent.style.color = "#f87171"; // Red-400
+            userStatusComponent.style.color = "#f87171";
             btnToggleStatus.textContent = "Go Online";
             btnToggleStatus.className = "w-full mt-2 px-4 py-2 rounded font-semibold bg-green-600 hover:bg-green-700";
             offlineBlocker.style.display = 'flex';
             buttons.forEach(btn => btn.disabled = true);
-            // Clear the main view and remove active states from buttons
+            cleanUpView();
             main.innerHTML = `<h2 class="text-2xl font-semibold mb-4">Offline</h2><p>Go online to access application features.</p>`;
             buttons.forEach(b => b.classList.remove('active'));
         }
     }
 
     btnToggleStatus.onclick = async () => {
-        // Prevent clicking too fast
         btnToggleStatus.disabled = true;
         await postForm(`${baseUrl}/user/status`, { online: !isOnline });
         await checkStatus();
         btnToggleStatus.disabled = false;
     };
 
+
     document.getElementById('btnListUsers').onclick = async () => {
-        main.innerHTML = `<h2 class="text-xl mb-2">All Users</h2>
-        <button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button>
-        <div id="list"></div>`;
+        cleanUpView();
+        main.innerHTML = `<h2 class="text-xl mb-2">Find Users</h2>
+            <button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button>
+            <div id="list"></div>`;
 
         async function load() {
             const users = await getJSON(`${baseUrl}/users`);
             const div = document.getElementById('list');
-            div.innerHTML = Object.entries(users).map(([userId, status]) =>
-                `<div class="p-3 bg-gray-800 rounded mb-2 flex justify-between items-center">
-                    <span class="font-mono">${userId}</span>
-                    <span class="font-bold" style="color: ${status ? '#4ade80' : '#f87171'};">${status ? 'Online' : 'Offline'}</span>
-                </div>`
-            ).join('') || '<p class="text-gray-400">No other users found.</p>';
-        }
-        document.getElementById('refresh').onclick = load;
-        load();
-    };
+            const userEntries = Object.entries(users);
 
-    document.getElementById('btnListGroups').onclick = async () => {
-        main.innerHTML = `<h2 class="text-xl mb-2">All Groups</h2>
-        <button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button>
-        <div id="list"></div>`;
-        async function load() {
-            const groups = await getJSON(`${baseUrl}/groups/listGroups`);
-            const div = document.getElementById('list');
-            div.innerHTML = groups.map(g =>
-                `<div class="p-2 bg-gray-800 rounded mb-2">
-                    <div><b>ID:</b> ${g.groupId}</div>
-                    <div><b>Owner:</b> ${g.groupOwnerId}</div>
-                    <div><b>Participants:</b> ${g.participants.join(', ')}</div>
-                </div>`
-            ).join('');
-        }
-        document.getElementById('refresh').onclick = load;
-        load();
-    };
+            div.innerHTML = userEntries.map(([userId, status]) => {
+                let actionHtml = '';
+                if (userId === clientId) {
+                    actionHtml = '<span class="text-xs text-gray-500 pr-3">(This is you)</span>';
+                } else {
+                    actionHtml = `<button class="request-chat-btn bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded" data-id="${userId}">Request Chat</button>`;
+                }
 
-    document.getElementById('btnMyGroups').onclick = async () => {
-        main.innerHTML = `<h2 class="text-xl mb-2">My Groups</h2>
-        <button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button>
-        <div id="list"></div>`;
-        async function load() {
-            const groups = await getJSON(`${baseUrl}/groups/listMyGroups`);
-            const div = document.getElementById('list');
-            div.innerHTML = groups.map(g =>
-                `<div class="p-2 bg-gray-800 rounded mb-2">
-                    <div><b>ID:</b> ${g.groupId}</div>
-                    <div><b>Owner:</b> ${g.groupOwnerId}</div>
-                    <div><b>Participants:</b> ${g.participants.join(', ')}</div>
-                </div>`
-            ).join('');
-        }
-        document.getElementById('refresh').onclick = load;
-        load();
-    };
-
-    document.getElementById('btnRequests').onclick = async () => {
-        main.innerHTML = `<h2 class="text-xl mb-2">Pending Group Requests</h2>
-        <button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button>
-        <div id="list"></div>`;
-        async function load() {
-            const requests = await getJSON(`${baseUrl}/groups/listGroupRequests`);
-            const div = document.getElementById('list');
-            if (!requests.length) {
-                div.innerHTML = `<p class="text-gray-400">No pending requests.</p>`;
-                return;
-            }
-            div.innerHTML = requests.map(r =>
-                `<div class="p-3 bg-gray-800 rounded mb-2 flex justify-between items-center">
+                return `
+                <div class="p-3 bg-gray-800 rounded mb-2 flex justify-between items-center">
                     <div>
-                        <div><b>Group:</b> ${r.groupId}</div>
-                        <div><b>User:</b> ${r.userId}</div>
+                        <span class="font-mono">${userId}</span>
+                        <span class="ml-4 font-bold" style="color: ${status ? '#4ade80' : '#f87171'};">${status ? 'Online' : 'Offline'}</span>
                     </div>
-                    <button class="bg-green-600 px-3 py-1 rounded accept-btn" data-id="${r.requestId}">Accept</button>
-                </div>`
-            ).join('');
-            document.querySelectorAll('.accept-btn').forEach(btn => {
+                    <div>${actionHtml}</div>
+                </div>`;
+            }).join('');
+
+            document.querySelectorAll('.request-chat-btn').forEach(btn => {
                 btn.onclick = async () => {
-                    const id = btn.getAttribute('data-id');
-                    await postForm(`${baseUrl}/groups/acceptUserInGroup`, { requestId: id });
-                    load();
+                    const toId = btn.getAttribute('data-id');
+                    btn.textContent = 'Sent!';
+                    btn.disabled = true;
+                    await postForm(`${baseUrl}/requestSession`, { toId });
                 };
             });
         }
@@ -222,46 +178,114 @@
         load();
     };
 
+    document.getElementById('btnPendingRequests').onclick = async () => {
+        cleanUpView();
+        main.innerHTML = `<h2 class="text-xl mb-2">Pending Chat Requests</h2>
+            <button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button>
+            <div id="list"></div>`;
+        async function load() {
+            const requests = await getJSON(`${baseUrl}/listPendingRequests`);
+            const div = document.getElementById('list');
+            div.innerHTML = requests.map(req =>
+                `<div class="p-3 bg-gray-800 rounded mb-2 flex justify-between items-center">
+                    <span>Request from <b class="font-mono">${req.fromId}</b></span>
+                    <button class="accept-session-btn bg-green-600 px-3 py-1 rounded" data-session-id="${req.proposedSessionId}">Accept</button>
+                 </div>`
+            ).join('') || '<p class="text-gray-400">No pending requests.</p>';
+
+            document.querySelectorAll('.accept-session-btn').forEach(btn => {
+                btn.onclick = async () => {
+                    const sessionId = btn.getAttribute('data-session-id');
+                    await postForm(`${baseUrl}/acceptSession`, { sessionId });
+                    load();
+                }
+            });
+        }
+        document.getElementById('refresh').onclick = load;
+        load();
+    };
+
+    document.getElementById('btnActiveSessions').onclick = async () => {
+        cleanUpView();
+        main.innerHTML = `<h2 class="text-xl mb-2">Active Sessions</h2>
+            <button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button>
+            <div id="list"></div>`;
+        async function load() {
+            const sessions = await getJSON(`${baseUrl}/listActiveSessions`);
+            const div = document.getElementById('list');
+            const sessionEntries = Object.entries(sessions);
+
+            if (sessionEntries.length === 0) {
+                div.innerHTML = '<p class="text-gray-400">No active sessions.</p>';
+                return;
+            }
+
+            div.innerHTML = sessionEntries.map(([sessionId, participantId]) =>
+                `<div class="p-3 bg-gray-800 rounded mb-2">
+                    <div>Chat with: <b class="font-mono">${participantId}</b></div>
+                    <div class="text-xs text-gray-400 mt-1">Session ID: <span class="font-mono">${sessionId}</span></div>
+                 </div>`
+            ).join('');
+        }
+        document.getElementById('refresh').onclick = load;
+        load();
+    };
+
+
+    document.getElementById('btnListGroups').onclick = async () => {
+        cleanUpView();
+        main.innerHTML = `<h2 class="text-xl mb-2">All Groups</h2><button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button><div id="list"></div>`;
+        async function load() {
+            const groups = await getJSON(`${baseUrl}/groups/listGroups`);
+            document.getElementById('list').innerHTML = groups.map(g => `<div class="p-2 bg-gray-800 rounded mb-2"><div><b>ID:</b> ${g.groupId}</div><div><b>Owner:</b> ${g.groupOwnerId}</div><div><b>Participants:</b> ${g.participants.join(', ')}</div></div>`).join('');
+        }
+        document.getElementById('refresh').onclick = load; load();
+    };
+    document.getElementById('btnMyGroups').onclick = async () => {
+        cleanUpView();
+        main.innerHTML = `<h2 class="text-xl mb-2">My Groups</h2><button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button><div id="list"></div>`;
+        async function load() {
+            const groups = await getJSON(`${baseUrl}/groups/listMyGroups`);
+            document.getElementById('list').innerHTML = groups.map(g => `<div class="p-2 bg-gray-800 rounded mb-2"><div><b>ID:</b> ${g.groupId}</div><div><b>Owner:</b> ${g.groupOwnerId}</div><div><b>Participants:</b> ${g.participants.join(', ')}</div></div>`).join('');
+        }
+        document.getElementById('refresh').onclick = load; load();
+    };
+    document.getElementById('btnRequests').onclick = async () => {
+        cleanUpView();
+        main.innerHTML = `<h2 class="text-xl mb-2">Pending Group Requests</h2><button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button><div id="list"></div>`;
+        async function load() {
+            const requests = await getJSON(`${baseUrl}/groups/listGroupRequests`);
+            const div = document.getElementById('list');
+            if (!requests.length) { div.innerHTML = `<p class="text-gray-400">No pending requests.</p>`; return; }
+            div.innerHTML = requests.map(r => `<div class="p-3 bg-gray-800 rounded mb-2 flex justify-between items-center"><div><div><b>Group:</b> ${r.groupId}</div><div><b>User:</b> ${r.userId}</div></div><button class="bg-green-600 px-3 py-1 rounded accept-btn" data-id="${r.requestId}">Accept</button></div>`).join('');
+            document.querySelectorAll('.accept-btn').forEach(btn => { btn.onclick = async () => { await postForm(`${baseUrl}/groups/acceptUserInGroup`, { requestId: btn.getAttribute('data-id') }); load(); }; });
+        }
+        document.getElementById('refresh').onclick = load; load();
+    };
     document.getElementById('btnEnterCreate').onclick = async () => {
-        main.innerHTML = `
-        <h2 class="text-xl mb-2">Enter or Create Group</h2>
-        <div class="mb-4">
-            <input id="groupIdInput" class="bg-gray-800 p-2 rounded w-64 mr-2" placeholder="Group ID">
-            <button id="createBtn" class="bg-green-600 px-3 py-1 rounded">Enter/Create</button>
-        </div>
-        <button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button>
-        <div id="list"></div>`;
+        cleanUpView();
+        main.innerHTML = `<h2 class="text-xl mb-2">Enter or Create Group</h2><div class="mb-4"><input id="groupIdInput" class="bg-gray-800 p-2 rounded w-64 mr-2" placeholder="Group ID"><button id="createBtn" class="bg-green-600 px-3 py-1 rounded">Enter/Create</button></div><button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button><div id="list"></div>`;
         async function load() {
             const groups = await getJSON(`${baseUrl}/groups/listGroups`);
             const div = document.getElementById('list');
-            div.innerHTML = groups.map(g =>
-                `<div class="p-2 bg-gray-800 rounded mb-2 flex justify-between items-center">
-                    <div>
-                        <b>${g.groupId}</b> — ${g.participants.length} members
-                    </div>
-                    <button class="join-btn bg-indigo-600 px-3 py-1 rounded" data-id="${g.groupId}">Join</button>
-                </div>`
-            ).join('');
+            div.innerHTML = groups.map(g => `<div class="p-2 bg-gray-800 rounded mb-2 flex justify-between items-center"><div><b>${g.groupId}</b> — ${g.participants.length} members</div><button class="join-btn bg-indigo-600 px-3 py-1 rounded" data-id="${g.groupId}">Join</button></div>`).join('');
             document.querySelectorAll('.join-btn').forEach(btn => {
                 btn.onclick = async () => {
-                    const id = btn.getAttribute('data-id');
-                    await postForm(`${baseUrl}/groups/enterOrCreateGroup`, { groupId: id });
-                    alert('Request sent!');
+                    const response = await postForm(`${baseUrl}/groups/enterOrCreateGroup`, { groupId: btn.getAttribute('data-id') });
+                    alert(response);
                 };
             });
         }
         document.getElementById('createBtn').onclick = async () => {
             const id = document.getElementById('groupIdInput').value.trim();
             if (!id) return alert('Enter a group ID');
-            await postForm(`${baseUrl}/groups/enterOrCreateGroup`, { groupId: id });
-            alert('Request sent!');
+            const response = await postForm(`${baseUrl}/groups/enterOrCreateGroup`, { groupId: id });
+            alert(response);
             load();
         };
-        document.getElementById('refresh').onclick = load;
-        load();
+        document.getElementById('refresh').onclick = load; load();
     };
 
-    // Initial status check on page load
     checkStatus();
 </script>
 </body>

@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  mqtt-broker:
+    image: eclipse-mosquitto:latest
+    container_name: mqtt-broker
+    ports:
+      - "1884:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+    networks:
+      - chattito-network
+    healthcheck:
+      test: ["CMD-SHELL", "netstat -tuln | grep 1883"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chattito-heitor:
+    build: .
+    container_name: chattito-heitor
+    ports:
+      - "8080:8080"
+    environment:
+      - CLIENT_ID=Heitor
+      - BROKER_CONNECTIONSTRING=tcp://mqtt-broker:1883
+      - API_BASE_PORT=8080
+    depends_on:
+      mqtt-broker:
+        condition: service_healthy
+    networks:
+      - chattito-network
+
+  chattito-marco:
+    build: .
+    container_name: chattito-marco
+    ports:
+      - "8081:8080"
+    environment:
+      - CLIENT_ID=Marco
+      - BROKER_CONNECTIONSTRING=tcp://mqtt-broker:1883
+      - API_BASE_PORT=8081
+    depends_on:
+      mqtt-broker:
+        condition: service_healthy
+    networks:
+      - chattito-network
+
+  chattito-lucas:
+    build: .
+    container_name: chattito-lucas
+    ports:
+      - "8082:8080"
+    environment:
+      - CLIENT_ID=Lucas
+      - BROKER_CONNECTIONSTRING=tcp://mqtt-broker:1883
+      - API_BASE_PORT=8082
+    depends_on:
+      mqtt-broker:
+        condition: service_healthy
+    networks:
+      - chattito-network
+
+networks:
+  chattito-network:
+    driver: bridge

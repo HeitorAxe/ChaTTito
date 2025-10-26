@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class PageController {
 
-    @Value("${server.port}")
+    @Value("${api.base.port}")
     private String serverPort;
     @Value("${client.id}")
     private String clientId;

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.catalina.Group;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -29,14 +31,17 @@ public class MqttClientService implements MqttCallback {
     private final Map<String, Consumer<String>> sessionListeners = new ConcurrentHashMap<>();
     private final ObjectMapper                  objectMapper     = new ObjectMapper();
 
+    @Setter
     @Value("${client.id}")
     private       String                  clientId;
+    @Getter
     private final Map<String, String>     activeSessions        = new ConcurrentHashMap<>();
-    private final Map<String, Boolean>    sessionRequests       = new ConcurrentHashMap<>();
+    private final List<SessionRequest>    sessionRequests       = new ArrayList<>();
     private       List<GroupData>         groups                = new ArrayList<>();
     private       List<GroupEnterRequest> groupEnterRequestList = new ArrayList<>();
     private final List<GroupData>         activeGroups          = new ArrayList<>();
     private       Map<String, Boolean>    usersStatus           = new ConcurrentHashMap<>();
+    @Getter
     private       Boolean                 clientStatus          = true;
 
     @PostConstruct
@@ -59,10 +64,6 @@ public class MqttClientService implements MqttCallback {
         }catch (Exception e){
             System.out.println("Ocorreu um erro e o Client" + clientId + " não pôde publicar seu status.");
         }
-    }
-
-    public void setClientId(String clientId) {
-        this.clientId = clientId;
     }
 
 
@@ -112,11 +113,11 @@ public class MqttClientService implements MqttCallback {
     }
 
     public void setStatusOnline(Boolean online) throws Exception{
-        if(online == this.clientStatus)
-            return;
-
         var message = new MessageTemplate("user_status_update", this.clientId, "", online ? "ONLINE" : "OFFLINE");
-
+        if(online == this.clientStatus){
+            client.publish("users", message.getMqttMessage(objectMapper));
+            return;
+        }
 
         if(online) {
             client.connect(opts);
@@ -129,12 +130,20 @@ public class MqttClientService implements MqttCallback {
         this.clientStatus = online;
     }
 
-    public Boolean getClientStatus(){
-        return this.clientStatus;
-    }
 
+    public void acceptSession(String sessionId) throws Exception {
+        String toId = "";
+        for(var sessionRequest : sessionRequests){
+            if(sessionRequest.getProposedSessionId().equals(sessionId)){
+                toId = sessionRequest.getFromId();
+                sessionRequest.setAccepted(true);
+                break;
+            }
+        }
+        if(toId.isEmpty()){
+            throw new RuntimeException("Não foi possível aceitar a sessão "+sessionId);
+        }
 
-    public void acceptSession(String toId, String sessionId) throws Exception {
         client.subscribe("sessions/" + sessionId);
 
         var message = new MessageTemplate("session_accept", this.clientId, toId, sessionId);
@@ -182,6 +191,12 @@ public class MqttClientService implements MqttCallback {
         System.err.println("Conexão perdida com broker: " + cause.getMessage());
     }
 
+    public List<SessionRequest> getPendingSessionRequests(){
+        return this.sessionRequests.stream()
+                .filter(r -> Boolean.FALSE.equals(r.getAccepted()))
+                .toList();
+    }
+
 
     @Override
     public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
@@ -199,8 +214,11 @@ public class MqttClientService implements MqttCallback {
             }
         } else if (topic.startsWith("users/") && topic.endsWith("/control")) {
             if(type.equals("session_request")){
-                String proposedSessionId = message.getText();
-                sessionRequests.put(proposedSessionId, false);
+                var newSessionRequest = new SessionRequest(message.getFrom(), message.getText(), false);
+                sessionRequests.add(newSessionRequest);
+            }
+            if(type.equals("session_accept")){
+                activeSessions.put(message.getText(), message.getFrom());
             }
             if(type.equals("group_enter_accept")){
                 for(var group : groups){
