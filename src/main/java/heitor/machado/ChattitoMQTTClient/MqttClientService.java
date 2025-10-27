@@ -192,9 +192,7 @@ public class MqttClientService implements MqttCallback {
     }
 
     public List<SessionRequest> getPendingSessionRequests(){
-        return this.sessionRequests.stream()
-                .filter(r -> Boolean.FALSE.equals(r.getAccepted()))
-                .toList();
+        return this.sessionRequests;
     }
 
 

@@ -183,24 +183,50 @@
         main.innerHTML = `<h2 class="text-xl mb-2">Pending Chat Requests</h2>
             <button id="refresh" class="bg-blue-600 px-3 py-1 rounded mb-4">Refresh</button>
             <div id="list"></div>`;
+            
         async function load() {
             const requests = await getJSON(`${baseUrl}/listPendingRequests`);
             const div = document.getElementById('list');
-            div.innerHTML = requests.map(req =>
-                `<div class="p-3 bg-gray-800 rounded mb-2 flex justify-between items-center">
+
+            if (!requests || requests.length === 0) {
+                div.innerHTML = '<p class="text-gray-400">No pending requests.</p>';
+                return;
+            }
+            
+            div.innerHTML = requests.map(req => {
+                const isAccepted = req.accepted === true;
+                
+                const buttonHtml = isAccepted
+                    ? `<button disabled class="px-3 py-1 rounded bg-gray-500 cursor-not-allowed">Accepted</button>`
+                    : `<button class="accept-session-btn bg-green-600 hover:bg-green-700 px-3 py-1 rounded" data-session-id="${req.proposedSessionId}">Accept</button>`;
+
+                return `
+                <div class="p-3 bg-gray-800 rounded mb-2 flex justify-between items-center">
                     <span>Request from <b class="font-mono">${req.fromId}</b></span>
-                    <button class="accept-session-btn bg-green-600 px-3 py-1 rounded" data-session-id="${req.proposedSessionId}">Accept</button>
-                 </div>`
-            ).join('') || '<p class="text-gray-400">No pending requests.</p>';
+                    ${buttonHtml}
+                </div>`;
+            }).join('');
 
             document.querySelectorAll('.accept-session-btn').forEach(btn => {
                 btn.onclick = async () => {
                     const sessionId = btn.getAttribute('data-session-id');
-                    await postForm(`${baseUrl}/acceptSession`, { sessionId });
-                    load();
-                }
+                    try {
+                        btn.disabled = true;
+                        
+                        await postForm(`${baseUrl}/acceptSession`, { sessionId });
+                        
+                        btn.textContent = 'Accepted';
+                        btn.classList.remove('accept-session-btn', 'bg-green-600', 'hover:bg-green-700');
+                        btn.classList.add('bg-gray-500', 'cursor-not-allowed');
+                    } catch (error) {
+                        console.error('Failed to accept session:', error);
+                        btn.disabled = false;
+                        alert('Failed to accept the request. Please try again.');
+                    }
+                };
             });
         }
+
         document.getElementById('refresh').onclick = load;
         load();
     };
